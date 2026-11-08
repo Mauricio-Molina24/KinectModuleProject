@@ -1,0 +1,30 @@
+# Python environments and caches
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Visual Studio local state and build output
+.vs/
+**/.vs/
+*.vcxproj.user
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+**/x64/
+**/x86/
+build-native*/
+native/optimized-build/
+*.pdb
+*.obj
+*.pch
+*.iobj
+*.ipdb
+*.ilk
+*.tlog/
+*.lastbuildstate
+*.recipe
+*.exp
+*.lib
