@@ -7,22 +7,22 @@ Aplicación experimental para capturar frames sincronizados de una Microsoft Kin
 - Windows x64.
 - Sensor Microsoft Kinect v2 y Kinect for Windows SDK 2.0 instalado.
 - Python 3.10 o 3.11 de 64 bits.
-- GPU NVIDIA y una rueda de PyTorch CUDA compatible con su controlador.
+- Se recomienda una GPU compatible con PyTorch para procesar video en tiempo real. Sin aceleración por GPU, el programa puede funcionar en CPU, pero será bastante más lento.
 - Microsoft Visual Studio 2022 con la carga de trabajo de C++ si se desea compilar el DLL.
 - OpenCV C++ 4.12.0 para compilar el DLL. La DLL de ejecución `opencv_world4120.dll` se incluye junto al wrapper.
 
 ## Preparar Python
 
-Para esta PC (Python 3.11, RTX 3060 y driver NVIDIA 591.74), desde la carpeta raíz del repositorio:
+Desde la carpeta raíz del repositorio, crea un entorno e instala las dependencias comunes:
 
 ```powershell
-py -3.11 -m venv .venv
+py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements-cu130.txt
+python -m pip install -r requirements.txt
 ```
 
-`requirements-cu130.txt` conserva las versiones de NumPy, OpenCV para Python, Ultralytics y PyTorch de este equipo. `requirements.txt` queda como la configuración inicial del proyecto con CUDA 13.2; el entorno de esta PC usa CUDA 13.0 dentro de PyTorch.
+El archivo `requirements.txt` instala las dependencias comunes y no fija un modelo de GPU ni una versión de CUDA. Para aceleración NVIDIA, instala PyTorch con la opción de Windows/Pip/CUDA compatible con el controlador, usando el [selector oficial de PyTorch](https://pytorch.org/get-started/locally/). Si no hay CUDA disponible, el proyecto selecciona CPU automáticamente; la inferencia será más lenta. `requirements-cu130.txt` queda como perfil opcional para reproducir el entorno de una PC específica, no como requisito del proyecto.
 
 ## Ejecutar
 
