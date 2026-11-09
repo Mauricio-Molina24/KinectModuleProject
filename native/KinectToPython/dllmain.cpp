@@ -149,9 +149,12 @@ KINECT_API bool kinect_get_synchronized_frames(unsigned char* color_buffer, int 
 extern "C" KINECT_API bool kinect_get_synchronized_frames_depth_to_color(
     unsigned char* color_buffer, int color_buffer_size,
     unsigned short* depth_buffer, int depth_buffer_size,
-    float* map_buffer, int map_float_count) noexcept {
+    float* map_buffer, int map_float_count,
+    float* camera_space_buffer, int camera_space_float_count) noexcept {
     if (!color_buffer || color_buffer_size < colorBytes || !depth_buffer || depth_buffer_size < depthBytes ||
-        !map_buffer || map_float_count < depthPixels * 2 || !pMultiSourceReader || !pCoordinateMapper) {
+        !map_buffer || map_float_count < depthPixels * 2 ||
+        !camera_space_buffer || camera_space_float_count < depthPixels * 3 ||
+        !pMultiSourceReader || !pCoordinateMapper) {
         lastError = "Invalid synchronized-frame buffers or readers"; return false;
     }
     try {
@@ -174,6 +177,7 @@ extern "C" KINECT_API bool kinect_get_synchronized_frames_depth_to_color(
         std::vector<unsigned char> colorTemp(colorBytes);
         std::vector<UINT16> depthTemp(depthPixels);
         std::vector<ColorSpacePoint> mapTemp(depthPixels);
+        std::vector<CameraSpacePoint> cameraSpaceTemp(depthPixels);
         hr = colorFrame->CopyConvertedFrameDataToArray(colorBytes, colorTemp.data(), ColorImageFormat_Bgra);
         if (FAILED(hr)) { set_hr_error("CopyConvertedFrameDataToArray", hr); return false; }
         UINT depthCount = 0;
@@ -185,12 +189,17 @@ extern "C" KINECT_API bool kinect_get_synchronized_frames_depth_to_color(
         hr = pCoordinateMapper->MapDepthFrameToColorSpace(
             depthCount, depthData, depthPixels, mapTemp.data());
         if (FAILED(hr)) { set_hr_error("MapDepthFrameToColorSpace", hr); return false; }
+        hr = pCoordinateMapper->MapDepthFrameToCameraSpace(
+            depthCount, depthData, depthPixels, cameraSpaceTemp.data());
+        if (FAILED(hr)) { set_hr_error("MapDepthFrameToCameraSpace", hr); return false; }
 
         std::memcpy(color_buffer, colorTemp.data(), colorBytes);
         std::memcpy(depth_buffer, depthTemp.data(), depthBytes);
         static_assert(sizeof(ColorSpacePoint) == sizeof(float) * 2, "Unexpected ColorSpacePoint layout");
+        static_assert(sizeof(CameraSpacePoint) == sizeof(float) * 3, "Unexpected CameraSpacePoint layout");
         std::memcpy(map_buffer, mapTemp.data(), depthPixels * sizeof(ColorSpacePoint));
-        lastError = "Synchronized color, depth and depth-to-color map acquired successfully";
+        std::memcpy(camera_space_buffer, cameraSpaceTemp.data(), depthPixels * sizeof(CameraSpacePoint));
+        lastError = "Synchronized color, depth and camera-space map acquired successfully";
         return true;
     } catch (...) { lastError = "Unexpected error acquiring synchronized frames"; return false; }
 }

@@ -1,0 +1,9 @@
+# Entorno de esta PC: Python 3.11 x64, RTX 3060, NVIDIA driver 591.74.
+# PyTorch CUDA 13.0 funciona con el driver instalado y no requiere CUDA Toolkit global.
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+numpy==2.2.6
+opencv-python==5.0.0.93
+ultralytics==8.4.203
+torch==2.14.1+cu130
+torchvision==0.29.1+cu130

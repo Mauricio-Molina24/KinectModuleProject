@@ -51,6 +51,7 @@ class KinectWrapper:
             ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int,
             ctypes.POINTER(ctypes.c_ushort), ctypes.c_int,
             ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float), ctypes.c_int,
         ]
         
         self.dll.kinect_get_last_error.restype = ctypes.c_char_p
@@ -74,17 +75,17 @@ class KinectWrapper:
         error_msg = self.dll.kinect_get_last_error()
         return error_msg.decode('utf-8') if error_msg else "No error"
     
-    def get_color_frame(self):
-        """Obtener frame de color como numpy array"""
+    def get_color_frame(self, retries=30, retry_delay=0.1):
+        """Obtener un frame de color, esperando hasta 3 s a que arranque el stream."""
         buffer_size = self.color_width * self.color_height * 4
         buffer = (ctypes.c_ubyte * buffer_size)()
         
-        # Reintentar múltiples veces
-        for attempt in range(5):
+        for attempt in range(retries):
             if self.dll.kinect_get_color_frame(buffer, buffer_size):
                 frame = np.frombuffer(buffer, dtype=np.uint8)
                 return frame.reshape((self.color_height, self.color_width, 4))
-            time.sleep(0.1)
+            if attempt + 1 < retries:
+                time.sleep(retry_delay)
         return None
     
     def get_depth_frame(self):
@@ -100,7 +101,7 @@ class KinectWrapper:
             time.sleep(0.1)  # Pequeña pausa entre intentos
         return None
     
-    def get_synchronized_frames(self, retries=10, retry_delay=0.05):
+    def get_synchronized_frames(self, retries=30, retry_delay=0.1):
         """Return (BGRA color, uint16 depth in mm, float32 RGB->depth map).
 
         All three arrays are copied from one Kinect MultiSourceFrame. Invalid
@@ -132,18 +133,21 @@ class KinectWrapper:
             time.sleep(retry_delay)
         return None, None, None
 
-    def get_synchronized_frames_depth_to_color(self, retries=10, retry_delay=0.05):
-        """Return BGRA color, uint16 depth (mm), and a depth-resolution map to color.
+    def get_synchronized_frames_depth_to_color(self, retries=30, retry_delay=0.1):
+        """Return BGRA color, depth (mm), depth-to-color map, and camera XYZ (m).
 
         The map has shape (depth_height, depth_width, 2); each depth pixel stores
         its corresponding (x, y) coordinate in the original color image.
+        The camera-space array has shape (depth_height, depth_width, 3) in meters.
         """
         color_count = self.color_width * self.color_height * 4
         depth_count = self.depth_width * self.depth_height
         map_float_count = depth_count * 2
+        camera_space_float_count = depth_count * 3
         color = (ctypes.c_ubyte * color_count)()
         depth = (ctypes.c_ushort * depth_count)()
         coordinate_map = (ctypes.c_float * map_float_count)()
+        camera_space = (ctypes.c_float * camera_space_float_count)()
         self.last_depth_to_color_attempts = 0
 
         for attempt in range(retries):
@@ -152,6 +156,7 @@ class KinectWrapper:
                 color, color_count,
                 depth, depth_count * ctypes.sizeof(ctypes.c_ushort),
                 coordinate_map, map_float_count,
+                camera_space, camera_space_float_count,
             )
             if ok:
                 color_array = np.ctypeslib.as_array(color).reshape(
@@ -163,7 +168,10 @@ class KinectWrapper:
                 map_array = np.ctypeslib.as_array(coordinate_map).reshape(
                     self.depth_height, self.depth_width, 2
                 ).copy()
-                return color_array, depth_array, map_array
+                camera_space_array = np.ctypeslib.as_array(camera_space).reshape(
+                    self.depth_height, self.depth_width, 3
+                ).copy()
+                return color_array, depth_array, map_array, camera_space_array
             time.sleep(retry_delay)
         return None, None, None
 

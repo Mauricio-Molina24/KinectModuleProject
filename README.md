@@ -1,28 +1,28 @@
 # KinectModuleProject
 
-Aplicación experimental para capturar frames sincronizados de una Microsoft Kinect v2, segmentar objetos en la imagen RGB con YOLO y estimar la distancia de cada máscara usando el mapa de coordenadas de Kinect entre depth y color.
+Aplicación experimental para capturar frames sincronizados de una Microsoft Kinect v2, segmentar objetos en la imagen RGB con YOLO y estimar la distancia radial de cada máscara usando las coordenadas 3D de cámara del Kinect.
 
 ## Requisitos del sistema
 
 - Windows x64.
 - Sensor Microsoft Kinect v2 y Kinect for Windows SDK 2.0 instalado.
-- Python 3.10 de 64 bits.
-- GPU NVIDIA compatible con CUDA 13.2 para la configuración actual de PyTorch. Para CPU u otra versión de CUDA, instalar la variante correspondiente de PyTorch desde su selector oficial antes de instalar `requirements.txt`.
+- Python 3.10 o 3.11 de 64 bits.
+- GPU NVIDIA y una rueda de PyTorch CUDA compatible con su controlador.
 - Microsoft Visual Studio 2022 con la carga de trabajo de C++ si se desea compilar el DLL.
 - OpenCV C++ 4.12.0 para compilar el DLL. La DLL de ejecución `opencv_world4120.dll` se incluye junto al wrapper.
 
 ## Preparar Python
 
-Desde la carpeta raíz del repositorio, en PowerShell:
+Para esta PC (Python 3.11, RTX 3060 y driver NVIDIA 591.74), desde la carpeta raíz del repositorio:
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-cu130.txt
 ```
 
-El archivo `requirements.txt` fija las versiones de NumPy, OpenCV para Python, Ultralytics y PyTorch del entorno usado en esta versión.
+`requirements-cu130.txt` conserva las versiones de NumPy, OpenCV para Python, Ultralytics y PyTorch de este equipo. `requirements.txt` queda como la configuración inicial del proyecto con CUDA 13.2; el entorno de esta PC usa CUDA 13.0 dentro de PyTorch.
 
 ## Ejecutar
 
@@ -32,7 +32,7 @@ Con el Kinect conectada y el SDK instalado:
 python .\python\kinectmodule\main.py
 ```
 
-El modelo de ejemplo `yolov8n-seg.pt` se encuentra junto al módulo. Se puede cambiar la ruta y los parámetros en `python/kinectmodule/config.py`. La cámara entrega color BGRA; el programa lo convierte a BGR para YOLO. La captura sincronizada incluye la imagen depth y el mapa depth→color, que el estimador usa para consultar los valores de profundidad dentro de cada máscara.
+El modelo de ejemplo `yolov8n-seg.pt` se encuentra junto al módulo. Se puede cambiar la ruta y los parámetros en `python/kinectmodule/config.py`. La cámara entrega color BGRA; el programa lo convierte a BGR para YOLO. La captura sincronizada incluye la imagen depth, el mapa depth→color y las coordenadas 3D de cámara. El estimador usa estas últimas para reportar distancia radial al objeto; no toma el piso como referencia.
 
 ## DLL nativo
 

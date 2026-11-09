@@ -38,25 +38,36 @@ def main():
 
     print("Kinect inicializada correctamente.")
 
-    time.sleep(1)
-
     try:
+        print("Esperando el primer frame sincronizado...")
+        first_color, _, _, _ = kinect.get_synchronized_frames_depth_to_color(
+            retries=30,
+            retry_delay=0.1,
+        )
+        if first_color is None:
+            print("Error al iniciar los streams:", kinect.get_last_error())
+            return
+
+        print("Streams de color y profundidad listos.")
+        last_capture_error_time = 0.0
+        last_depth_report_time = 0.0
+
         while True:
             loop_start = time.perf_counter()
 
             # 1. Obtener captura sincronizada
-            color, depth, depth_to_color_map = (
-                kinect.get_synchronized_frames_depth_to_color(
-                    retries=2,
-                    retry_delay=0.01,
-                )
+            color, depth, depth_to_color_map, camera_space_xyz = kinect.get_synchronized_frames_depth_to_color(
+                retries=5,
+                retry_delay=0.03,
             )
             capture_ms = (time.perf_counter() - loop_start) * 1000
 
             if color is None:
-                print("Error obteniendo frames:", kinect.get_last_error())
-                # En modo en vivo es mejor descartar un frame que esperar mucho.
-                time.sleep(0.01)
+                now = time.monotonic()
+                if now - last_capture_error_time >= 1.0:
+                    print("Error obteniendo frames:", kinect.get_last_error())
+                    last_capture_error_time = now
+                time.sleep(0.05)
                 continue
 
             # 2. Convertir BGRA a BGR
@@ -72,11 +83,53 @@ def main():
             object_depths = distance_estimator.estimate(
                 depth_mm=depth,
                 depth_to_color_map=depth_to_color_map,
+                camera_space_xyz=camera_space_xyz,
                 masks=masks,
             )
 
+            # Reportar una lectura reciente de cada objeto en la terminal.
+            now = time.monotonic()
+            if now - last_depth_report_time >= 1.0:
+                readings = []
+                for estimate in object_depths:
+                    if result.boxes is None or estimate.instance_id >= len(result.boxes):
+                        continue
+
+                    class_id = int(result.boxes.cls[estimate.instance_id].item())
+                    if isinstance(result.names, dict):
+                        class_name = result.names.get(class_id, str(class_id))
+                    else:
+                        class_name = result.names[class_id]
+
+                    if estimate.distance_m is None:
+                        distance_text = "sin lectura válida"
+                    else:
+                        distance_text = f"{estimate.distance_m:.2f} m"
+
+                    reliability_notes = []
+                    if estimate.valid_pixels < 20:
+                        reliability_notes.append("pocas muestras")
+                    if estimate.distance_mm is not None and estimate.distance_mm > 4500:
+                        reliability_notes.append("más allá de 4.5 m")
+                    reliability_text = (
+                        f"; baja confiabilidad: {', '.join(reliability_notes)}"
+                        if reliability_notes
+                        else ""
+                    )
+
+                    readings.append(
+                        f"{class_name}: {distance_text} "
+                        f"({estimate.valid_pixels} píxeles válidos{reliability_text})"
+                    )
+
+                if readings:
+                    print("Distancia radial | " + " | ".join(readings))
+                else:
+                    print("Distancia radial | Sin objetos detectados.")
+                last_depth_report_time = now
+
             # 5. Mostrar detecciones con su distancia estimada.
-            key = visualizer.show(color_bgr, depth, result, object_depths)
+            key = visualizer.show(color_bgr, depth, result)
 
             # Informar promedios en bloques, evitando imprimir cada frame.
             yolo_ms = sum(result.speed.values())
